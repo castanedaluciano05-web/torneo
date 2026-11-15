@@ -126,6 +126,38 @@ textarea{width:100%;min-height:200px;border:1px solid var(--borde);border-radius
 .inf td{padding:6px 4px;border-bottom:1px solid var(--linea);font-size:13px}
 .inf td.n2{text-align:right;font-weight:600}
 .pie{font-size:11px;color:var(--gris2);text-align:center;margin-top:16px}
+/* árbitros y veedores */
+.goleadores{font-size:12px;color:var(--gris);margin:-4px 0 6px;line-height:1.4}
+.codigo{font-size:28px;letter-spacing:8px;text-align:center;width:100%;height:56px;border:1px solid var(--borde);border-radius:12px;background:#fff}
+.mp{display:block;width:100%;text-align:left;background:#fff;border:1px solid var(--borde);border-radius:12px;padding:10px 12px;margin-bottom:8px;cursor:pointer}
+.mp .t{display:flex;justify-content:space-between;gap:8px;font-size:14px;font-weight:600}
+.mp .k{margin:4px 0 0}
+.marcador{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;background:#fff;border:1px solid var(--borde);border-radius:14px;padding:12px;margin-bottom:10px;text-align:center}
+.marcador .n{font-size:13px;font-weight:600}
+.marcador .g{font-size:40px;font-weight:700;color:var(--verde2);min-width:110px}
+.lados{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.lado{background:#fff;border:1px solid var(--borde);border-radius:12px;padding:8px}
+.lado .k{text-align:center;font-weight:600;color:var(--texto)}
+.lado button{width:100%;margin-top:6px;padding:10px 4px;border-radius:10px;border:1px solid var(--borde);background:#fff;cursor:pointer;font-size:14px}
+.b-gol{background:var(--verdeclaro)!important;color:var(--verde2);font-weight:700}
+.b-am{background:#FAEEDA!important;color:#633806}
+.b-ro{background:var(--rojoclaro)!important;color:var(--rojo)}
+.b-ec{font-size:12px!important;color:var(--gris)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.chips button{border:1px solid var(--borde);background:#fff;border-radius:20px;padding:6px 12px;cursor:pointer;font-size:13px}
+.chips button.on{background:var(--verde3);color:#fff;border-color:var(--verde3)}
+.inc{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--linea);font-size:14px}
+.inc:last-child{border-bottom:0}
+.inc .ti{font-size:11px;font-weight:700;border-radius:5px;padding:2px 6px;min-width:62px;text-align:center}
+.inc .x{margin-left:auto;background:none;border:0;font-size:20px;color:var(--gris2);cursor:pointer;padding:0 6px}
+.picker{background:#fff;border:2px solid var(--verde3);border-radius:14px;padding:10px;margin-bottom:10px}
+.picker .js{display:grid;grid-template-columns:1fr;gap:4px;max-height:300px;overflow:auto;margin:8px 0}
+.picker .js button{text-align:left;border:1px solid var(--linea);background:#fff;border-radius:8px;padding:9px 10px;cursor:pointer;font-size:14px}
+.picker .js button b{display:inline-block;min-width:28px;color:var(--gris)}
+.susp{font-size:10px;font-weight:700;background:var(--rojoclaro);color:var(--rojo);border-radius:5px;padding:1px 5px;margin-left:6px}
+.alerta{font-size:13px;background:var(--ambar);color:var(--ambar2);border-radius:10px;padding:8px 10px;margin-bottom:8px}
+.error{font-size:13px;background:var(--rojoclaro);color:var(--rojo);border-radius:10px;padding:8px 10px;margin-bottom:8px}
+.fija{position:sticky;bottom:70px;background:var(--fondo);padding:8px 0 4px}
 </style>
 </head>
 <body>
@@ -149,6 +181,9 @@ textarea{width:100%;min-height:200px;border:1px solid var(--borde);border-radius
    Vacío = DEMO con datos inventados (se carga desde la misma aplicación).
    También se puede probar con  Torneo.html?planilla=ENLACE   o   Torneo.html?prueba=local  */
 const PLANILLA = "";
+/* PUENTE: el enlace del Apps Script de la planilla (termina en /exec). Con él, árbitros y veedores
+   cargan desde la aplicación. Vacío = sólo lectura. En la DEMO se simula (códigos 1111 árbitro, 2222 veedor). */
+const PUENTE = "";
 const CADA_SEGUNDOS = 60;   // cada cuánto busca resultados nuevos mientras está abierta
 
 /* ===================== CONFIGURACIÓN (en modo real la pisa la hoja «Configuración») ===================== */
@@ -163,8 +198,13 @@ const CONFIG = {
   canchas: ["Cancha 1","Cancha 2","Cancha 3"],
   horarios: ["14:00","15:30","17:00"],
   primeraFecha: "2026-10-17",           // sábado
-  golesMax: 20
+  golesMax: 20,
+  amarillasSuspenden: 5,                // cada tantas amarillas, 1 fecha
+  fechasDobleAmarilla: 1,
+  fechasRoja: 2
 };
+let JUGADORES = {};                     // id de equipo → [{cam, n}]
+const TIPOS=["Gol","Gol en contra","Amarilla","Roja"];
 let EQUIPOS = [
   ["Los Pibes","#185FA5"],["Deportivo Sur","#A32D2D"],["La Unión","#3B6D11"],["Barrio Norte","#854F0B"],
   ["Estrella Roja","#E24B4A"],["Atlético Oeste","#534AB7"],["Juventud Unida","#0F6E56"],["El Fortín","#2C2C2A"],
@@ -191,7 +231,7 @@ function armarFixture(){
     for(let i=0;i<n/2;i++){
       let a=t[i], b=t[n-1-i];
       if((i===0 && r%2===1) || (i>0 && (r+i)%2===1)) [a,b]=[b,a];
-      ps.push({id:"F"+(r+1)+"-"+(i+1), fecha:r+1, dia:fmtFecha(fechaDe(r+1)), cancha:CONFIG.canchas[i%3], hora:CONFIG.horarios[Math.floor(i/3)], l:a, v:b, gl:"", gv:"", pub:false, wo:""});
+      ps.push({id:String(ps.length+1), fecha:r+1, dia:fmtFecha(fechaDe(r+1)), cancha:CONFIG.canchas[i%3], hora:CONFIG.horarios[Math.floor(i/3)], l:a, v:b, gl:"", gv:"", pub:false, wo:"", arbitro:"", veedor:"", cargo:"", confirmo:""});
     }
     t.splice(1,0,t.pop());
   }
@@ -199,25 +239,36 @@ function armarFixture(){
 }
 function rng(seed){ return function(){ seed|=0; seed=seed+0x6D2B79F5|0; let t=Math.imul(seed^seed>>>15,1|seed); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
 const GOLES=[0,0,1,1,1,2,2,2,3,3,4,5];
-function simular(ps, hasta, seed){
-  const r=rng(seed);
-  ps.forEach(p=>{ if(p.fecha<=hasta && !p.pub){ p.gl=String(GOLES[Math.floor(r()*GOLES.length)]); p.gv=String(GOLES[Math.floor(r()*GOLES.length)]); p.pub=true; } });
+function simular(ps, hasta, seed, inc){
+  const r=rng(seed), al=a=>a[Math.floor(r()*a.length)];
+  ps.forEach(p=>{ if(p.fecha<=hasta && !p.pub){
+    p.gl=String(al(GOLES)); p.gv=String(al(GOLES)); p.pub=true; p.cargo="Árbitro demo"; p.confirmo="Veedor demo";
+    if(inc){
+      [[p.l,+p.gl],[p.v,+p.gv]].forEach(([e,g])=>{ const js=JUGADORES[e]||[]; for(let k=0;k<g;k++){ const j=al(js.slice(4)); inc.push({n:p.id,eq:e,cam:j.cam,jug:r()<0.08?"":j.n,tipo:"Gol"}); } });
+      [p.l,p.v].forEach(e=>{ const js=JUGADORES[e]||[]; if(r()<0.6) inc.push({n:p.id,eq:e,...pick(al(js)),tipo:"Amarilla"}); if(r()<0.25) inc.push({n:p.id,eq:e,...pick(al(js)),tipo:"Amarilla"}); if(r()<0.06) inc.push({n:p.id,eq:e,...pick(al(js)),tipo:"Roja"}); });
+    }
+  } });
 }
+const pick=j=>({cam:j.cam,jug:j.n});
+const NOMS=["Juan","Lucas","Matías","Nicolás","Diego","Martín","Franco","Pablo","Gonzalo","Leandro","Emiliano","Ramiro","Bruno","Tomás","Facundo","Ezequiel","Lautaro","Agustín"];
+const APES=["Gómez","Fernández","López","Martínez","Díaz","Pérez","Sosa","Romero","Ruiz","Torres","Álvarez","Acosta","Benítez","Medina","Herrera","Aguirre","Giménez","Molina","Rojas","Castro","Ortiz","Silva","Núñez","Luna"];
+function jugadoresDemo(){ const r=rng(77), J={}; EQUIPOS.forEach(e=>{ const u=new Set(); J[e.id]=[]; for(let c=1;c<=14;c++){ let n; do{ n=APES[Math.floor(r()*APES.length)]+", "+NOMS[Math.floor(r()*NOMS.length)]; }while(u.has(n)); u.add(n); J[e.id].push({cam:String(c),n}); } }); return J; }
 function estadoInicial(){
-  const ps=armarFixture(); simular(ps,5,2026);
-  return {partidos:ps, cruces:{}, vistas:{}, toques:{}};
+  const ps=armarFixture(), inc=[]; simular(ps,5,2026,inc);
+  return {partidos:ps, cruces:{}, incidencias:inc, vistas:{}, toques:{}};
 }
 
 /* ===================== ESTADO ===================== */
 const QS=new URLSearchParams(location.search);
 const ORIGEN = QS.get("prueba")==="local" ? "local" : (QS.get("planilla")||PLANILLA).trim();
 const REAL = !!ORIGEN;                       // true = lee la planilla; false = demo
-const KEY = REAL ? "torneo_datos_v1_"+(ORIGEN==="local"?"local":idDePlanilla(ORIGEN)) : "torneo_demo_v1";
+const KEY = REAL ? "torneo_datos_v2_"+(ORIGEN==="local"?"local":idDePlanilla(ORIGEN)) : "torneo_demo_v2";
+const PUENTE_URL = (QS.get("puente")||PUENTE).trim();
 let S, ACTUALIZADO=null, SIN_CONEXION=false, PLANILLA_ID="";
 try{ S=JSON.parse(localStorage.getItem(KEY)); }catch(e){ S=null; }
+if(!REAL) JUGADORES=jugadoresDemo();
 if(REAL){ if(!(S&&S.equipos)) S=null; }   // lo guardado se aplica más abajo, cuando todo está definido
-else if(!S||!S.partidos) S=estadoInicial();
-else S.partidos.forEach(p=>{ if(!p.dia) p.dia=fmtFecha(fechaDe(p.fecha)); });   // demos guardadas antes de este cambio
+else if(!S||!S.partidos||!S.incidencias) S=estadoInicial();
 function guardar(){ try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(e){} }
 let TOTAL_FECHAS=EQUIPOS.length-1;
 const eq=id=>EQUIPOS[id];
@@ -254,8 +305,8 @@ const esSi=v=>/^s[ií]/i.test(String(v||"").trim());
 const num=v=>{ const s=String(v??"").trim().replace(/\.0+$/,""); return /^\d{1,2}$/.test(s)?String(+s):""; };
 async function traerPlanilla(){
   PLANILLA_ID=ORIGEN==="local"?"":idDePlanilla(ORIGEN);
-  const [P,C,E,PU,CF]=await Promise.all(["Partidos","Cruces","Equipos","Publicidad","Configuración"].map(n=>hoja(n).catch(e=>{ if(n==="Partidos"||n==="Equipos") throw e; return []; })));
-  const d={equipos:[],partidos:[],cruces:{},sponsors:[],config:{},cuando:Date.now()};
+  const [P,C,E,PU,CF,IN,JU]=await Promise.all(["Partidos","Cruces","Equipos","Publicidad","Configuración","Incidencias","Jugadores"].map(n=>hoja(n).catch(e=>{ if(n==="Partidos"||n==="Equipos") throw e; return []; })));
+  const d={equipos:[],partidos:[],cruces:{},sponsors:[],config:{},incidencias:[],jugadores:[],cuando:Date.now()};
   const idx={};
   const idEq=(n,c)=>{ n=String(n||"").trim(); if(!n) return null; const k=n.toLowerCase(); if(!(k in idx)){ idx[k]=d.equipos.length; d.equipos.push([n,c||""]); } return idx[k]; };
   E.forEach(r=>idEq(r["Equipo"],r["Color"]));
@@ -265,8 +316,12 @@ async function traerPlanilla(){
     const wo=/^loc/i.test(r["No se presentó"])?"l":/^vis/i.test(r["No se presentó"])?"v":"";
     let gl=num(r["Goles local"]), gv=num(r["Goles visitante"]);
     if(wo){ const [a,b]=CONFIG.woResultado; if(wo==="l"){gl=String(b);gv=String(a);} else {gl=String(a);gv=String(b);} }
-    d.partidos.push({id:"P"+(i+2),fecha:fe,dia:r["Día"]||"",hora:String(r["Hora"]||"").slice(0,5),cancha:r["Cancha"]||"",l,v,gl,gv,wo,pub:esSi(r["Publicar"])&&gl!==""&&gv!==""});
+    d.partidos.push({id:String(r["N°"]||"").trim()||"F"+(i+2),fecha:fe,dia:r["Día"]||"",hora:String(r["Hora"]||"").slice(0,5),cancha:r["Cancha"]||"",l,v,gl,gv,wo,
+      pub:esSi(r["Publicar"])&&gl!==""&&gv!=="", arbitro:r["Árbitro"]||"", veedor:r["Veedor"]||"", cargo:r["Cargó"]||"", confirmo:r["Confirmó"]||""});
   });
+  IN.forEach(r=>{ const e=idEq(r["Equipo"]), t=TIPOS.find(x=>x.toLowerCase()===String(r["Tipo"]||"").trim().toLowerCase()); if(e===null||!t) return;
+    d.incidencias.push({n:String(r["N° partido"]||"").trim(),eq:e,cam:r["Camiseta"]||"",jug:r["Jugador"]||"",tipo:t}); });
+  JU.forEach(r=>{ const e=idEq(r["Equipo"]); if(e===null||!r["Jugador"]) return; d.jugadores.push([e,String(r["Camiseta"]||"").trim(),r["Jugador"].trim()]); });
   if(!d.partidos.length) throw new Error("No encontré los partidos: revisá que la hoja se llame «Partidos» y tenga las columnas Fecha, Local y Visitante.");
   C.forEach(r=>{
     const copa=/^pla/i.test(r["Copa"])?"plata":"oro", k=String(r["Llave"]||"").trim(); if(!k) return;
@@ -295,7 +350,12 @@ function aplicarDatos(d){
   if(c["goles máximos"]&&n("goles máximos")) CONFIG.golesMax=n("goles máximos");
   if(c["resultado del w.o."]){ const m=c["resultado del w.o."].match(/(\d+)\D+(\d+)/); if(m) CONFIG.woResultado=[+m[1],+m[2]]; }
   if(c["desempate"]){ const t=c["desempate"].toLowerCase(), orden=[["dif",t.indexOf("diferencia")],["gf",t.indexOf("favor")],["entre",t.indexOf("entre")]].filter(x=>x[1]>=0).sort((a,b)=>a[1]-b[1]).map(x=>x[0]); if(orden.length) CONFIG.desempate=orden; }
+  if(n("amarillas que suspenden")) CONFIG.amarillasSuspenden=n("amarillas que suspenden");
+  if(n("fechas por doble amarilla")!==null) CONFIG.fechasDobleAmarilla=n("fechas por doble amarilla");
+  if(n("fechas por roja directa")!==null) CONFIG.fechasRoja=n("fechas por roja directa");
   EQUIPOS=d.equipos.map(([nm,col],i)=>nuevoEquipo(nm,col||PALETA[i%PALETA.length],i));
+  JUGADORES={}; (d.jugadores||[]).forEach(([e,cam,nm])=>{ (JUGADORES[e]||(JUGADORES[e]=[])).push({cam,n:nm}); });
+  Object.values(JUGADORES).forEach(js=>js.sort((a,b)=>(+a.cam||99)-(+b.cam||99)));
   SPONSORS=d.sponsors.map(s=>({...s,ic:s.n.split(/\s+/).filter(Boolean).map(w=>w[0]).join("").slice(0,2).toUpperCase(),c:s.nivel==="oro"?"#993C1D":s.nivel==="plata"?"#993C1D":"#5F5E5A"}));
   TOTAL_FECHAS=Math.max(1,...d.partidos.map(p=>p.fecha));
   if(CONFIG.copaPlata&&EQUIPOS.length<CONFIG.clasifican+8) CONFIG.copaPlata=false;
@@ -306,11 +366,13 @@ async function actualizar(){
   if(!REAL) return;
   try{
     const d=await traerPlanilla();
-    const viejo=S?JSON.stringify({p:S.partidos,c:S.cruces,s:S.sponsors,e:S.equipos,f:S.config}):"";
-    const nuevo={...d, partidos:d.partidos, vistas:(S&&S.vistas)||{}, toques:(S&&S.toques)||{}};
+    const firma=x=>JSON.stringify({p:x.partidos,c:x.cruces,s:x.sponsors,e:x.equipos,f:x.config,i:x.incidencias,j:x.jugadores});
+    const viejo=S?firma(S):"";
+    const nuevo={...d, vistas:(S&&S.vistas)||{}, toques:(S&&S.toques)||{}};
     aplicarDatos(nuevo); S=nuevo; ACTUALIZADO=new Date(); SIN_CONEXION=false; ERROR_PLANILLA=""; guardar();
-    const cambio=viejo!==JSON.stringify({p:S.partidos,c:S.cruces,s:S.sponsors,e:S.equipos,f:S.config});
-    if(cambio||pantalla==="inicio") render(); else pintarCabecera();
+    const cambio=viejo!==firma(S);
+    // nunca redibujar mientras alguien está cargando un partido o escribiendo su código
+    if((cambio||pantalla==="inicio")&&!["carga","ingreso"].includes(pantalla)) render(); else pintarCabecera();
   }catch(e){
     SIN_CONEXION=true; ERROR_PLANILLA=e.message||String(e);
     if(!S){ main.innerHTML=`<div class="card" style="text-align:center;padding:24px"><b>No se pudieron traer los resultados.</b><div class="k" style="margin-top:8px">${h(ERROR_PLANILLA)}</div><button class="btn prim" style="margin-top:12px" onclick="actualizar()">Probar de nuevo</button></div>`; }
@@ -380,7 +442,8 @@ const IC={
  wa:'<path d="M4 20l1.3-3.8A8 8 0 1 1 8 19z"/><path d="M9 9.5c0 3 2.5 5.5 5.5 5.5l1-1.5-2-1-1 1c-1-.5-2-1.5-2.5-2.5l1-1-1-2z"/>',
  sponsor:'<path d="M3 11l15-6v14L3 13z"/><path d="M7 13v5h3v-4"/>',
  info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 8h.01"/>',
- reset:'<path d="M4 12a8 8 0 1 0 3-6.3"/><path d="M4 4v4h4"/>'
+ reset:'<path d="M4 12a8 8 0 1 0 3-6.3"/><path d="M4 4v4h4"/>',
+ silbato:'<circle cx="9" cy="14" r="5"/><path d="M12 10l8-4v4h-6"/><circle cx="9" cy="14" r="1.2"/>'
 };
 const svg=(k)=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${IC[k]}</svg>`;
 const esc=(e)=>`<div class="esc" style="background:${e.c}">${e.ini}</div>`;
@@ -416,10 +479,19 @@ function pubOro(){
 let pantalla="inicio", fechaVista=null, copaVista="oro", sub=null;
 const main=document.getElementById("main");
 
-function filaPartido(p){
+function filaPartido(p,det){
   const L=eq(p.l), V=eq(p.v);
   const sc=p.pub?`<div class="sc">${p.gl} – ${p.gv}</div>`:`<div class="sc pend">${p.hora}</div>`;
-  return `<div class="row"><div class="eq">${esc(L)}<span>${h(L.n)}</span></div>${sc}<div class="eq r"><span>${h(V.n)}</span>${esc(V)}</div></div>${p.wo?`<div style="text-align:center;margin:-4px 0 4px"><span class="tag wo">W.O. · no se presentó ${h(eq(p.wo==="l"?p.l:p.v).n)}</span></div>`:""}`;
+  let extra="";
+  if(det&&p.pub&&!p.wo){
+    const inc=(S.incidencias||[]).filter(i=>i.n===p.id);
+    const gs=(e)=>{ const c={}; inc.filter(i=>(i.tipo==="Gol"&&i.eq===e)).forEach(i=>{ const k=i.jug?i.jug.split(",")[0]:"s/d"; c[k]=(c[k]||0)+1; });
+      inc.filter(i=>i.tipo==="Gol en contra"&&i.eq!==e).forEach(i=>{ const k=(i.jug?i.jug.split(",")[0]:"s/d")+" (e/c)"; c[k]=(c[k]||0)+1; });
+      return Object.entries(c).map(([k,v])=>k+(v>1?" "+v:"")).join(", "); };
+    const a=gs(p.l), b=gs(p.v), am=inc.filter(i=>i.tipo==="Amarilla").length, ro=inc.filter(i=>i.tipo==="Roja").length;
+    if(a||b||am||ro) extra=`<div class="goleadores">${a?h(L.n)+": "+h(a):""}${a&&b?" · ":""}${b?h(V.n)+": "+h(b):""}${am||ro?`<br>Tarjetas: ${am?am+" amarilla"+(am>1?"s":""):""}${am&&ro?", ":""}${ro?ro+" roja"+(ro>1?"s":""):""}`:""}</div>`;
+  }
+  return `<div class="row"><div class="eq">${esc(L)}<span>${h(L.n)}</span></div>${sc}<div class="eq r"><span>${h(V.n)}</span>${esc(V)}</div></div>${p.wo?`<div style="text-align:center;margin:-4px 0 4px"><span class="tag wo">W.O. · no se presentó ${h(eq(p.wo==="l"?p.l:p.v).n)}</span></div>`:""}${extra}`;
 }
 
 function vInicio(){
@@ -447,14 +519,18 @@ function vFecha(){
   if(fechaVista===null) fechaVista=Math.max(1,ultimaFechaJugada()||1);
   const f=fechaVista, ps=S.partidos.filter(p=>p.fecha===f), n=ps.filter(p=>p.pub).length;
   let html=`<div class="selfecha"><button data-f="-1" aria-label="Fecha anterior">‹</button><div style="text-align:center"><b>Fecha ${f}</b><small>${diaDe(f)} · ${n} de ${ps.length} publicados</small></div><button data-f="1" aria-label="Fecha siguiente">›</button></div>`;
-  html+=`<div class="card" style="padding:4px 12px">${ps.map(filaPartido).join("")}</div>`;
+  html+=`<div class="card" style="padding:4px 12px">${ps.map(p=>filaPartido(p,true)).join("")}</div>`;
   html+=pubBronce();
   return html;
 }
 
+let tablaVista="pos";
 function vTabla(){
+  const seg=`<div class="seg"><button data-tv="pos" class="${tablaVista==="pos"?"on":""}">Posiciones</button><button data-tv="gol" class="${tablaVista==="gol"?"on":""}">Goleadores</button><button data-tv="san" class="${tablaVista==="san"?"on":""}">Sanciones</button></div>`;
+  if(tablaVista==="gol") return seg+vGoleadores()+pubOro();
+  if(tablaVista==="san") return seg+vSanciones()+pubOro();
   const T=tabla(), uf=ultimaFechaJugada();
-  let html=`<h2>Tabla de posiciones <span style="font-weight:400;color:var(--gris);font-size:13px">· después de la Fecha ${uf}</span></h2><div class="card" style="padding:6px 8px"><table class="tb"><tr><th>#</th><th style="text-align:left">Equipo</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>DG</th><th>Pts</th></tr>`;
+  let html=seg+`<h2>Tabla de posiciones <span style="font-weight:400;color:var(--gris);font-size:13px">· después de la Fecha ${uf}</span></h2><div class="card" style="padding:6px 8px"><table class="tb"><tr><th>#</th><th style="text-align:left">Equipo</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>DG</th><th>Pts</th></tr>`;
   T.forEach((t,i)=>{
     const e=eq(t.id), d=t.gf-t.gc;
     const cl=(i===CONFIG.clasifican-1)?"cut":(CONFIG.copaPlata&&i===CONFIG.clasifican+7)?"cut2":"";
@@ -499,7 +575,11 @@ function vFixture(){
 }
 
 function vMas(){
+  const ses=sesion();
   return `<div class="card menu">
+   <div class="it" data-go="ingreso">${svg("silbato")}<div>Árbitros y veedores<small>${ses?`Entraste como ${h(ses.nombre)} (${h(ses.rol)})`:"Cargar y confirmar resultados con tu código"}${colaPendiente().length?` · ${colaPendiente().length} sin enviar`:""}</small></div></div>
+  </div>
+  <div class="card menu">
    <div class="it" data-go="fixture">${svg("fixture")}<div>Fixture completo<small>Las ${TOTAL_FECHAS} fechas</small></div></div>
    ${REAL?"":`<div class="it" data-go="cargar">${svg("cargar")}<div>Cargar resultados<small>Lo que hace el organizador (en la versión final, en la planilla de Google)</small></div></div>`}
    <div class="it" data-go="insta">${svg("insta")}<div>Imagen para Instagram<small>Se arma sola con los resultados y los sponsors</small></div></div>
@@ -627,14 +707,248 @@ function vReglas(){
   <b>Copa de Oro:</b> los ${CONFIG.clasifican} primeros. Cuartos 1°-8°, 2°-7°, 3°-6°, 4°-5°; semifinales y final.<br>
   ${CONFIG.copaPlata?`<b>Copa de Plata:</b> del ${CONFIG.clasifican+1}° al ${CONFIG.clasifican+8}°, con el mismo sistema.<br>`:""}
   <b>Empate en un cruce:</b> ${CONFIG.empateCruce==="penales"?"penales":"pasa el mejor ubicado"}.<br>
-  <b>No presentación (W.O.):</b> el rival gana ${CONFIG.woResultado[0]} a ${CONFIG.woResultado[1]}.</div>
+  <b>No presentación (W.O.):</b> el rival gana ${CONFIG.woResultado[0]} a ${CONFIG.woResultado[1]}.<br>
+  <b>Tarjetas:</b> ${CONFIG.amarillasSuspenden} amarillas acumuladas = 1 fecha; doble amarilla = ${CONFIG.fechasDobleAmarilla} fecha${CONFIG.fechasDobleAmarilla>1?"s":""}; roja directa = ${CONFIG.fechasRoja} fecha${CONFIG.fechasRoja>1?"s":""}.<br>
+  <b>Resultados:</b> los carga el árbitro y los confirma el veedor. Recién ahí se publican.</div>
   <div class="k">En la versión final esto sale del reglamento del torneo.</div>`;
+}
+
+/* ===================== GOLEADORES Y SANCIONES (sólo partidos publicados) ===================== */
+function incPublicadas(){ const pub=new Set(S.partidos.filter(p=>p.pub&&!p.wo).map(p=>p.id)); return (S.incidencias||[]).filter(i=>pub.has(i.n)); }
+function goleadores(){
+  const c={};
+  incPublicadas().filter(i=>i.tipo==="Gol"&&i.jug).forEach(i=>{ const k=i.eq+"|"+i.jug; (c[k]||(c[k]={eq:i.eq,jug:i.jug,g:0})).g++; });
+  return Object.values(c).sort((a,b)=>b.g-a.g||a.jug.localeCompare(b.jug));
+}
+/* Devuelve por jugador: amarillas acumuladas y las fechas en que le corresponde no jugar (informativo). */
+function sanciones(){
+  const fe={}; S.partidos.forEach(p=>fe[p.id]=p.fecha);
+  const J={};
+  incPublicadas().filter(i=>i.jug&&(i.tipo==="Amarilla"||i.tipo==="Roja")).forEach(i=>{
+    const k=i.eq+"|"+i.jug, o=J[k]||(J[k]={eq:i.eq,jug:i.jug,pp:{},acum:0,susp:[]});
+    const pp=o.pp[i.n]||(o.pp[i.n]={am:0,roja:0}); if(i.tipo==="Amarilla") pp.am++; else pp.roja++;
+  });
+  Object.values(J).forEach(o=>{
+    Object.keys(o.pp).sort((a,b)=>fe[a]-fe[b]).forEach(n=>{
+      const f=fe[n], x=o.pp[n], add=(cant,motivo)=>{ for(let k=1;k<=cant;k++) o.susp.push({fecha:f+k,motivo}); };
+      if(x.roja) add(CONFIG.fechasRoja,"Roja directa (Fecha "+f+")");
+      else if(x.am>=2) add(CONFIG.fechasDobleAmarilla,"Doble amarilla (Fecha "+f+")");
+      else if(x.am===1){ o.acum++; if(CONFIG.amarillasSuspenden&&o.acum%CONFIG.amarillasSuspenden===0) add(1,CONFIG.amarillasSuspenden+" amarillas (Fecha "+f+")"); }
+    });
+  });
+  return J;
+}
+function suspendido(e,jug,fecha){ const o=sanciones()[e+"|"+jug]; return o?o.susp.find(s=>s.fecha===fecha):null; }
+function vGoleadores(){
+  const G=goleadores().slice(0,30);
+  if(!G.length) return `<div class="card" style="text-align:center;color:var(--gris)">Todavía no hay goles cargados con nombre.</div>`;
+  return `<div class="card" style="padding:6px 8px"><table class="tb"><tr><th>#</th><th style="text-align:left">Jugador</th><th style="text-align:left">Equipo</th><th>Goles</th></tr>${G.map((g,i)=>`<tr><td>${i+1}</td><td class="n">${h(g.jug)}</td><td class="n"><div class="eq">${esc(eq(g.eq))}<span>${h(eq(g.eq).n)}</span></div></td><td class="p">${g.g}</td></tr>`).join("")}</table></div>`;
+}
+function vSanciones(){
+  const J=Object.values(sanciones()), fa=fechaActual();
+  const ya=J.filter(o=>o.susp.some(s=>s.fecha>=fa)).map(o=>({...o,prox:o.susp.filter(s=>s.fecha>=fa)}));
+  const capilla=J.filter(o=>CONFIG.amarillasSuspenden>1&&o.acum%CONFIG.amarillasSuspenden===CONFIG.amarillasSuspenden-1);
+  let html=`<div class="aviso">Informativo, según el reglamento cargado. La sanción la confirma el organizador.</div>`;
+  html+=`<h2>No pueden jugar</h2><div class="card">${ya.length?ya.map(o=>`<div class="inc"><div class="eq" style="flex:1">${esc(eq(o.eq))}<span><b>${h(o.jug)}</b><br><small style="color:var(--gris)">${h(eq(o.eq).n)} · ${h(o.prox[0].motivo)}</small></span></div><span class="susp">Fecha${o.prox.length>1?"s":""} ${o.prox.map(s=>s.fecha).join(", ")}</span></div>`).join(""):`<div style="color:var(--gris)">Nadie suspendido.</div>`}</div>`;
+  html+=`<h2>A una amarilla de la suspensión</h2><div class="card">${capilla.length?capilla.map(o=>`<div class="inc"><div class="eq" style="flex:1">${esc(eq(o.eq))}<span>${h(o.jug)} <small style="color:var(--gris)">· ${h(eq(o.eq).n)}</small></span></div><span class="tag" style="background:var(--ambar);color:var(--ambar2)">${o.acum} amarillas</span></div>`).join(""):`<div style="color:var(--gris)">Nadie.</div>`}</div>`;
+  return html;
+}
+
+/* ===================== ÁRBITROS Y VEEDORES ===================== */
+const KSES=KEY+"_sesion", KCOLA=KEY+"_cola";
+const leerLS=(k,def)=>{ try{ const v=JSON.parse(localStorage.getItem(k)); return v??def; }catch(e){ return def; } };
+const escribirLS=(k,v)=>{ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} };
+function sesion(){ return leerLS(KSES,null); }
+function colaPendiente(){ return leerLS(KCOLA,[]); }
+const CODIGOS_DEMO={"1111":{nombre:"Árbitro de prueba",rol:"Árbitro"},"2222":{nombre:"Veedor de prueba",rol:"Veedor"}};
+const ahoraTxt=()=>{ const d=new Date(); return String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0")+" "+hora(d); };
+
+/* aplica una carga o confirmación sobre los datos del celular (demo, o mientras llega a la planilla) */
+function aplicarLocal(accion,d,quien){
+  const p=S.partidos.find(x=>x.id===String(d.n)); if(!p) return;
+  if(d.gl!==undefined){
+    p.gl=String(d.gl); p.gv=String(d.gv); p.wo=d.wo==="Local"?"l":d.wo==="Visitante"?"v":"";
+    S.incidencias=(S.incidencias||[]).filter(i=>i.n!==p.id).concat((d.incidencias||[]).map(i=>({n:p.id,eq:i.equipo===eq(p.l).n?p.l:p.v,cam:i.camiseta||"",jug:i.jugador||"",tipo:i.tipo})));
+    if(quien.rol==="Árbitro"){ p.cargo=quien.nombre+" · "+ahoraTxt(); p.confirmo=""; }
+  }
+  if(accion==="confirmar"){ p.pub=true; p.confirmo=quien.nombre+" · "+ahoraTxt(); if(!p.cargo) p.cargo=quien.nombre+" · "+ahoraTxt(); }
+  guardar();
+}
+/* lo mismo que hace el puente de Google, para la demo */
+function puenteDemo(accion,d){
+  const q=CODIGOS_DEMO[String(d.codigo||"")]; if(!q) return {ok:false,error:"Código incorrecto. En la demo: 1111 árbitro, 2222 veedor."};
+  if(accion==="entrar") return {ok:true,...q};
+  const p=S.partidos.find(x=>x.id===String(d.n)); if(!p) return {ok:false,error:"No encuentro el partido."};
+  if(accion==="confirmar"&&q.rol!=="Veedor") return {ok:false,error:"Sólo el veedor confirma."};
+  if(p.pub&&q.rol!=="Veedor") return {ok:false,error:"Ya está publicado. Para corregirlo, hablá con el veedor o el organizador."};
+  aplicarLocal(accion,d,q); return {ok:true,estado:accion==="confirmar"?"publicado":"cargado"};
+}
+async function puente(accion,d){
+  if(!REAL) return puenteDemo(accion,d);
+  if(!PUENTE_URL) return {ok:false,error:"Falta conectar el puente de la planilla (el organizador tiene que hacerlo una vez)."};
+  const r=await fetch(PUENTE_URL,{method:"POST",body:JSON.stringify({accion,...d})});   // sin encabezados: Google no pide permiso previo
+  try{ return await r.json(); }catch(e){ return {ok:false,error:"El puente no respondió bien ("+r.status+"). Avisale al organizador."}; }   // si no hay señal, fetch falla antes y va a la cola
+}
+/* envía; si no hay señal, queda en la cola del celular y se manda solo después */
+async function enviarCarga(accion,d){
+  const ses=sesion(); const datos={...d,codigo:ses.codigo};
+  try{
+    const r=await puente(accion,datos);
+    if(!r.ok) return {ok:false,error:r.error||"No se pudo guardar."};
+    if(REAL) aplicarLocal(accion,datos,ses);
+    return {ok:true};
+  }catch(e){
+    const c=colaPendiente().filter(x=>!(x.d.n===d.n&&x.accion===accion)); c.push({accion,d:datos,cuando:Date.now()}); escribirLS(KCOLA,c);
+    aplicarLocal(accion,datos,ses);
+    return {ok:true,enCola:true};
+  }
+}
+let AVISOS_COLA=[];
+async function procesarCola(){
+  if(!REAL) return; const c=colaPendiente(); if(!c.length) return;
+  const quedan=[];
+  for(const x of c){
+    try{ const r=await puente(x.accion,x.d); if(!r.ok) AVISOS_COLA.push("No se guardó el partido N° "+x.d.n+": "+(r.error||"error")); }
+    catch(e){ quedan.push(x); }
+  }
+  escribirLS(KCOLA,quedan);
+  if(quedan.length<c.length){ cartel(quedan.length?"SE ENVIARON ALGUNOS":"SE ENVIÓ LO GUARDADO"); actualizar(); if(["ingreso","mas"].includes(pantalla)) render(); }
+}
+
+let fechaArb=null, BORR=null, ERROR_ING="", ENVIANDO=false;
+function fechaDeHoy(){ const d=new Date(), t=String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0"); const p=S.partidos.find(x=>String(x.dia).includes(t)); return p?p.fecha:null; }
+function misPartidos(ses,f){ const k=ses.rol==="Veedor"?"veedor":"arbitro", c=s=>String(s||"").trim().toLowerCase();
+  return S.partidos.filter(p=>p.fecha===f&&(!p[k]||c(p[k])===c(ses.nombre))); }
+function estadoPlanillero(p){
+  const enCola=colaPendiente().some(x=>x.d.n===p.id);
+  if(enCola) return ["medias","Guardado en el celular · se manda cuando haya señal"];
+  if(p.pub) return ["pub","Publicado"+(p.confirmo?" · confirmó "+p.confirmo.split(" · ")[0]:"")];
+  if(p.cargo) return ["listo","Cargó "+p.cargo+" · falta confirmar"];
+  return ["falta","Falta cargar"];
+}
+function vIngreso(){
+  const ses=sesion();
+  if(!ses){
+    return `<button class="volver" data-go="mas">‹ Volver</button><h2>Árbitros y veedores</h2>
+    <div class="card"><div class="k">Escribí tu código personal (te lo da el organizador)</div>
+    <input class="codigo" id="cod" type="password" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="······">
+    ${ERROR_ING?`<div class="error" style="margin-top:8px">${h(ERROR_ING)}</div>`:""}
+    <button class="btn prim w" style="margin-top:10px" data-pl="entrar">Entrar</button></div>
+    ${!REAL?`<div class="aviso">En la demo: <b>1111</b> entra como árbitro y <b>2222</b> como veedor.</div>`:""}
+    ${REAL&&!PUENTE_URL?`<div class="alerta">Todavía no está conectado el puente de la planilla: se puede entrar, pero no guardar.</div>`:""}`;
+  }
+  if(fechaArb===null) fechaArb=fechaDeHoy()||fechaActual();
+  const f=fechaArb, ps=misPartidos(ses,f), cola=colaPendiente();
+  let html=`<div style="display:flex;align-items:center;justify-content:space-between"><h2 style="margin:4px 2px">Hola, ${h(ses.nombre)}</h2><button class="btn" data-pl="salir" style="padding:6px 10px;font-size:13px">Salir</button></div>
+  <div class="k" style="margin:0 2px 10px">${ses.rol==="Veedor"?"Revisás lo que cargó el árbitro, corregís si hace falta y confirmás. Recién ahí se publica.":"Cargás goles (con el goleador) y tarjetas. El veedor confirma y se publica."}</div>`;
+  if(cola.length) html+=`<div class="alerta">${cola.length} partido${cola.length>1?"s":""} guardado${cola.length>1?"s":""} en el celular, sin enviar todavía. Se mandan solos cuando haya señal. <button class="btn" data-pl="reintentar" style="margin-top:6px;padding:6px 10px;font-size:13px">Probar ahora</button></div>`;
+  AVISOS_COLA.forEach(a=>html+=`<div class="error">${h(a)}</div>`);
+  html+=`<div class="selfecha"><button data-pf="-1" aria-label="Fecha anterior">‹</button><div style="text-align:center"><b>Fecha ${f}</b><small>${h(diaDe(f))}</small></div><button data-pf="1" aria-label="Fecha siguiente">›</button></div>`;
+  if(!ps.length) html+=`<div class="card" style="color:var(--gris)">No tenés partidos asignados en esta fecha.</div>`;
+  ps.forEach(p=>{ const [ce,te]=estadoPlanillero(p);
+    html+=`<button class="mp" data-abrir="${h(p.id)}"><div class="t"><span>${h(eq(p.l).n)}</span><span>${p.pub||p.cargo?h(p.gl)+" – "+h(p.gv):"vs."}</span><span style="text-align:right">${h(eq(p.v).n)}</span></div><div class="k">${h(p.cancha)} · ${h(p.hora)}</div><span class="est ${ce}">${h(te)}</span></button>`; });
+  return html;
+}
+function abrirCarga(id){
+  const p=S.partidos.find(x=>x.id===id); if(!p) return;
+  BORR={n:p.id, wo:p.wo==="l"?"Local":p.wo==="v"?"Visitante":"", inc:(S.incidencias||[]).filter(i=>i.n===p.id).map(i=>({...i})), pick:null, err:"", otro:""};
+  pantalla="carga"; render(); window.scrollTo(0,0);
+}
+function golesBorr(p){
+  if(BORR.wo){ const [a,b]=CONFIG.woResultado; return BORR.wo==="Local"?[b,a]:[a,b]; }
+  let gl=0,gv=0; BORR.inc.forEach(i=>{ if(i.tipo==="Gol"){ if(i.eq===p.l) gl++; else gv++; } if(i.tipo==="Gol en contra"){ if(i.eq===p.l) gv++; else gl++; } });
+  return [gl,gv];
+}
+const COLTIPO={"Gol":"b-gol","Gol en contra":"b-ec","Amarilla":"b-am","Roja":"b-ro"};
+function vCarga(){
+  const ses=sesion(); const p=S.partidos.find(x=>x.id===BORR.n);
+  if(!ses||!p){ pantalla="ingreso"; return vIngreso(); }
+  const [gl,gv]=golesBorr(p), L=eq(p.l), V=eq(p.v), soloVer=p.pub&&ses.rol!=="Veedor";
+  let html=`<button class="volver" data-pl="volver">‹ Mis partidos</button>
+  <div class="k">Fecha ${p.fecha} · ${h(p.dia)} · ${h(p.cancha)} · ${h(p.hora)}${p.cargo?" · cargó "+h(p.cargo):""}</div>
+  <div class="marcador"><div>${esc(L)}<div class="n">${h(L.n)}</div></div><div class="g">${gl} – ${gv}</div><div>${esc(V)}<div class="n">${h(V.n)}</div></div></div>`;
+  if(soloVer) html+=`<div class="alerta">Ya está publicado. Para corregirlo, hablá con el veedor o el organizador.</div>`;
+  if(!soloVer){
+    html+=`<div class="chips"><button data-wo="" class="${!BORR.wo?"on":""}">Se jugó</button><button data-wo="Local" class="${BORR.wo==="Local"?"on":""}">No vino ${h(L.n)}</button><button data-wo="Visitante" class="${BORR.wo==="Visitante"?"on":""}">No vino ${h(V.n)}</button></div>`;
+    if(BORR.wo) html+=`<div class="aviso">W.O.: el resultado lo pone el reglamento (${CONFIG.woResultado[0]} a ${CONFIG.woResultado[1]} para el que se presentó).</div>`;
+    else if(BORR.pick){
+      const e=BORR.pick.eq, js=JUGADORES[e]||[], t=BORR.pick.tipo;
+      html+=`<div class="picker"><b>${h(t)} · ${h(eq(e).n)}</b>${t==="Gol en contra"?`<div class="k">Elegí al jugador de ${h(eq(e).n)} que la metió en su arco (el gol cuenta para el rival).</div>`:""}
+      <div class="js">${js.map(j=>{ const su=suspendido(e,j.n,p.fecha); return `<button data-jug="${h(j.n)}" data-cam="${h(j.cam)}"><b>${h(j.cam)}</b>${h(j.n)}${su?`<span class="susp">suspendido</span>`:""}</button>`; }).join("")}
+      ${t==="Gol"?`<button data-jug="" data-cam=""><b>—</b>Sin dato del goleador</button>`:""}</div>
+      <div style="display:flex;gap:6px"><input id="otro" placeholder="Otro: Apellido, Nombre" style="flex:1;border:1px solid var(--borde);border-radius:8px;padding:8px;font-size:16px"><button class="btn" data-pl="otro">Agregar</button></div>
+      <button class="btn w" data-pl="cancelar" style="margin-top:8px">Cancelar</button></div>`;
+    } else {
+      html+=`<div class="lados">${[p.l,p.v].map(e=>`<div class="lado"><div class="k">${h(eq(e).n)}</div>
+        <button class="b-gol" data-add="Gol" data-eq="${e}">+ Gol</button><button class="b-am" data-add="Amarilla" data-eq="${e}">+ Amarilla</button>
+        <button class="b-ro" data-add="Roja" data-eq="${e}">+ Roja</button><button class="b-ec" data-add="Gol en contra" data-eq="${e}">+ Gol en contra</button></div>`).join("")}</div>`;
+    }
+  }
+  // avisos (no traban)
+  const avisos=[];
+  if(!BORR.wo){
+    const cnt={}; BORR.inc.forEach(i=>{ if(i.jug){ const k=i.eq+"|"+i.jug; cnt[k]=cnt[k]||{am:0,eq:i.eq,jug:i.jug}; if(i.tipo==="Amarilla") cnt[k].am++; } if(i.jug&&suspendido(i.eq,i.jug,p.fecha)) avisos.push(i.jug+" figura suspendido para esta fecha."); });
+    Object.values(cnt).forEach(o=>{ if(o.am>=2) avisos.push(o.jug+": dos amarillas = expulsión."); });
+  }
+  [...new Set(avisos)].forEach(a=>html+=`<div class="alerta">${h(a)}</div>`);
+  if(!BORR.wo&&BORR.inc.length){
+    html+=`<div class="card">${BORR.inc.map((i,k)=>`<div class="inc"><span class="ti ${COLTIPO[i.tipo]}">${h(i.tipo)}</span><span>${i.cam?`<b style="color:var(--gris)">${h(i.cam)}</b> `:""}${h(i.jug||"Sin dato")}<br><small style="color:var(--gris)">${h(eq(i.eq).n)}</small></span>${soloVer?"":`<button class="x" data-del="${k}" aria-label="Borrar">×</button>`}</div>`).join("")}</div>`;
+  } else if(!BORR.wo&&!BORR.pick&&!soloVer) html+=`<div class="k" style="text-align:center;margin:6px 0 10px">Tocá «+ Gol» o una tarjeta para empezar. Si terminó 0 a 0, enviá así.</div>`;
+  if(BORR.err) html+=`<div class="error">${h(BORR.err)}</div>`;
+  if(!soloVer&&!BORR.pick){
+    const lbl=ses.rol==="Veedor"?(p.pub?"Guardar corrección":"Confirmar y publicar"):"Enviar resultado";
+    html+=`<div class="fija"><button class="btn prim w" data-pl="enviar" ${ENVIANDO?"disabled":""}>${ENVIANDO?"Enviando…":lbl}</button></div>`;
+  }
+  return html;
+}
+async function clicPlanillero(e){
+  const t=e.target;
+  const tv=t.closest("[data-tv]"); if(tv){ tablaVista=tv.dataset.tv; render(); return true; }
+  const pf=t.closest("[data-pf]"); if(pf){ fechaArb=Math.min(TOTAL_FECHAS,Math.max(1,fechaArb+ +pf.dataset.pf)); render(); return true; }
+  const ab=t.closest("[data-abrir]"); if(ab){ abrirCarga(ab.dataset.abrir); return true; }
+  if(pantalla==="carga"&&BORR){
+    const p=S.partidos.find(x=>x.id===BORR.n);
+    const wo=t.closest("[data-wo]"); if(wo){ BORR.wo=wo.dataset.wo; BORR.err=""; render(); return true; }
+    const ad=t.closest("[data-add]"); if(ad){ BORR.pick={tipo:ad.dataset.add,eq:+ad.dataset.eq}; render(); window.scrollTo(0,0); return true; }
+    const ju=t.closest("[data-jug]"); if(ju&&BORR.pick){ BORR.inc.push({n:BORR.n,eq:BORR.pick.eq,cam:ju.dataset.cam,jug:ju.dataset.jug,tipo:BORR.pick.tipo}); BORR.pick=null; BORR.err=""; render(); return true; }
+    const de=t.closest("[data-del]"); if(de){ BORR.inc.splice(+de.dataset.del,1); render(); return true; }
+  }
+  const pl=t.closest("[data-pl]"); if(!pl) return false;
+  const a=pl.dataset.pl, ses=sesion();
+  if(a==="entrar"){
+    const cod=(document.getElementById("cod").value||"").replace(/\D/g,"");
+    if(cod.length<4){ ERROR_ING="Escribí el código completo."; render(); return true; }
+    try{ const r=await puente("entrar",{codigo:cod}); if(!r.ok){ ERROR_ING=r.error||"Código incorrecto."; render(); return true; }
+      escribirLS(KSES,{codigo:cod,nombre:r.nombre,rol:r.rol}); ERROR_ING=""; fechaArb=null; cartel("HOLA, "+r.nombre.split(" ")[0].toUpperCase()); render(); }
+    catch(x){ ERROR_ING="Sin señal: para entrar la primera vez hace falta internet."; render(); }
+    return true;
+  }
+  if(a==="salir"){ try{ localStorage.removeItem(KSES); }catch(x){} render(); return true; }
+  if(a==="reintentar"){ await procesarCola(); render(); return true; }
+  if(a==="volver"){ BORR=null; pantalla="ingreso"; render(); return true; }
+  if(a==="cancelar"){ BORR.pick=null; render(); return true; }
+  if(a==="otro"){ const v=(document.getElementById("otro").value||"").trim(); if(!v){ return true; } BORR.inc.push({n:BORR.n,eq:BORR.pick.eq,cam:"",jug:v.slice(0,60),tipo:BORR.pick.tipo}); BORR.pick=null; render(); return true; }
+  if(a==="enviar"&&!ENVIANDO){
+    const p=S.partidos.find(x=>x.id===BORR.n), [gl,gv]=golesBorr(p);
+    if(gl>CONFIG.golesMax||gv>CONFIG.golesMax){ BORR.err="Más de "+CONFIG.golesMax+" goles: revisá la carga."; render(); return true; }
+    const accion=ses.rol==="Veedor"?"confirmar":"cargar";
+    const txt=`${eq(p.l).n} ${gl} – ${gv} ${eq(p.v).n}${BORR.wo?" (W.O.)":""}`;
+    if(!confirm((accion==="confirmar"?"¿Confirmar y publicar?\n\n":"¿Enviar al veedor?\n\n")+txt)) return true;
+    ENVIANDO=true; render();
+    const d={n:p.id,gl,gv,wo:BORR.wo,incidencias:BORR.wo?[]:BORR.inc.map(i=>({equipo:eq(i.eq).n,camiseta:i.cam,jugador:i.jug,tipo:i.tipo}))};
+    const r=await enviarCarga(accion,d); ENVIANDO=false;
+    if(!r.ok){ BORR.err=r.error; render(); return true; }
+    cartel(r.enCola?"QUEDÓ GUARDADO · SE MANDA CUANDO HAYA SEÑAL":accion==="confirmar"?"PUBLICADO":"SE ENVIÓ AL VEEDOR");
+    BORR=null; pantalla="ingreso"; render(); window.scrollTo(0,0);
+    return true;
+  }
+  return false;
 }
 
 /* ===================== NAVEGACIÓN ===================== */
 const TABS=[["inicio","Inicio"],["fecha","Fecha"],["tabla","Tabla"],["cruces","Cruces"],["mas","Más"]];
-const VISTAS={inicio:vInicio,fecha:vFecha,tabla:vTabla,cruces:vCruces,mas:vMas,fixture:vFixture,cargar:vCargar,insta:vInsta,wa:vWA,informe:vInforme,reglas:vReglas};
-function tabDe(p){ return ({fixture:"mas",cargar:"mas",insta:"mas",wa:"mas",informe:"mas",reglas:"mas"})[p]||p; }
+const VISTAS={inicio:vInicio,fecha:vFecha,tabla:vTabla,cruces:vCruces,mas:vMas,fixture:vFixture,cargar:vCargar,insta:vInsta,wa:vWA,informe:vInforme,reglas:vReglas,ingreso:vIngreso,carga:vCarga};
+function tabDe(p){ return ({fixture:"mas",cargar:"mas",insta:"mas",wa:"mas",informe:"mas",reglas:"mas",ingreso:"mas",carga:"mas"})[p]||p; }
 const hora=d=>String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
 function pintarCabecera(){
   document.getElementById("tNombre").textContent=CONFIG.nombre;
@@ -657,7 +971,9 @@ function ir(p){ if(["fecha","insta","wa"].includes(p)) fechaVista=null; pantalla
 let cartelT;
 function cartel(t){ const c=document.getElementById("cartel"); document.getElementById("cartelTxt").textContent=t; c.hidden=false; clearTimeout(cartelT); cartelT=setTimeout(()=>c.hidden=true,1600); }
 
-document.addEventListener("click",e=>{
+document.addEventListener("keydown",e=>{ if(e.key==="Enter"&&e.target.id==="cod"){ const b=document.querySelector('[data-pl="entrar"]'); if(b) b.click(); } });
+document.addEventListener("click",async e=>{
+  if(await clicPlanillero(e)) return;
   const go=e.target.closest("[data-go]"); if(go){ ir(go.dataset.go); return; }
   const sp=e.target.closest("[data-sp]"); if(sp){ tocarSponsor(sp.dataset.sp); return; }
   const oro=e.target.closest("[data-sp-oro]"); if(oro){
@@ -674,7 +990,7 @@ document.addEventListener("click",e=>{
   const a=ac.dataset.accion;
   if(a==="actualizar"){ cartel("BUSCANDO…"); actualizar().then(()=>{ if(!SIN_CONEXION) cartel("AL DÍA"); if(pantalla==="mas") render(); }); }
   if(a==="reset"){ if(confirm("¿Volver la demo al principio? Se borra lo cargado en este celular.")){ S=estadoInicial(); guardar(); fechaCarga=null; cartel("DEMO REINICIADA"); ir("inicio"); } }
-  if(a==="simular"){ simular(S.partidos,TOTAL_FECHAS,Date.now()%100000); guardar(); cartel("FASE REGULAR COMPLETA"); fasesCarga="oro"; render(); }
+  if(a==="simular"){ simular(S.partidos,TOTAL_FECHAS,Date.now()%100000,S.incidencias); guardar(); cartel("FASE REGULAR COMPLETA"); fasesCarga="oro"; render(); }
   if(a==="bajar"){ const cv=document.getElementById("cv"); const l=document.createElement("a"); l.download="resultados-fecha-"+fechaVista+".png"; l.href=cv.toDataURL("image/png"); l.click(); cartel("IMAGEN DESCARGADA"); }
   if(a==="copiar"){ const t=document.getElementById("txwa").value; (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>cartel("YA SE COPIÓ"),()=>{ const ta=document.getElementById("txwa"); ta.removeAttribute("readonly"); ta.select(); document.execCommand("copy"); ta.setAttribute("readonly",""); cartel("YA SE COPIÓ"); }); }
   if(a==="abrirwa"){ window.open("https://wa.me/?text="+encodeURIComponent(document.getElementById("txwa").value),"_blank"); }
@@ -733,7 +1049,8 @@ if(REAL){
   actualizar();
   setInterval(()=>{ if(document.visibilityState==="visible") actualizar(); }, CADA_SEGUNDOS*1000);
   document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") actualizar(); });
-  window.addEventListener("online",actualizar);
+  window.addEventListener("online",()=>{ procesarCola(); actualizar(); });
+  setInterval(procesarCola, 30000); procesarCola();
 }
 /* que la página abra aunque no haya señal (sólo cuando está publicada en internet) */
 if("serviceWorker" in navigator && location.protocol==="https:"){ navigator.serviceWorker.register("sw.js").catch(()=>{}); }

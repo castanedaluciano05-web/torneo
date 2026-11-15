@@ -1,6 +1,6 @@
 // Guarda la aplicación en el celular para que abra sin señal.
 // Los resultados NO pasan por acá: se piden siempre a la planilla y la app guarda lo último.
-const CACHE = "torneo-v3";
+const CACHE = "torneo-v4";
 const ARCHIVOS = ["./", "./index.html", "./manifest.webmanifest", "./icono-192.png", "./icono-512.png", "./icono-180.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ARCHIVOS))); self.skipWaiting(); });
 self.addEventListener("activate", e => {

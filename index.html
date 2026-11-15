@@ -126,6 +126,7 @@ textarea{width:100%;min-height:200px;border:1px solid var(--borde);border-radius
 .inf td{padding:6px 4px;border-bottom:1px solid var(--linea);font-size:13px}
 .inf td.n2{text-align:right;font-weight:600}
 .pie{font-size:11px;color:var(--gris2);text-align:center;margin-top:16px}
+.pie.autor{margin-top:6px;font-size:12px}.pie.autor b{color:var(--gris);font-weight:600}
 /* árbitros y veedores */
 .goleadores{font-size:12px;color:var(--gris);margin:-4px 0 6px;line-height:1.4}
 .codigo{font-size:28px;letter-spacing:8px;text-align:center;width:100%;height:56px;border:1px solid var(--borde);border-radius:12px;background:#fff}
@@ -185,6 +186,7 @@ const PLANILLA = "https://docs.google.com/spreadsheets/d/146sPh-eBFzlLoYtFEURtS1
    cargan desde la aplicación. Vacío = sólo lectura. En la DEMO se simula (códigos 1111 árbitro, 2222 veedor). */
 const PUENTE = "https://script.google.com/macros/s/AKfycbzWy-DMtYM05Gxqhd96EKP5iOc6HUydHMxS-laQwRsVxEs1eymn0k4Y7ElcuNSGzKWCAQ/exec";
 const CADA_SEGUNDOS = 60;   // cada cuánto busca resultados nuevos mientras está abierta
+const AUTOR = "Juan José Castañeda";   // autoría: aparece en Inicio, Más y al abrir
 
 /* ===================== CONFIGURACIÓN (en modo real la pisa la hoja «Configuración») ===================== */
 const CONFIG = {
@@ -514,8 +516,10 @@ function vInicio(){
     <div class="bt" data-go="cruces">${svg("cruces")}Cruces</div>
     <div class="bt" data-go="fixture">${svg("fixture")}Fixture</div></div>`;
   html+=pubPlata();
+  html+=pieAutor();
   return html;
 }
+function pieAutor(){ return `<div class="pie autor">Aplicación creada por <b>${h(AUTOR)}</b></div>`; }
 
 function vFecha(){
   if(fechaVista===null) fechaVista=Math.max(1,ultimaFechaJugada()||1);
@@ -591,7 +595,7 @@ function vMas(){
   </div>
   ${REAL?`<div class="card menu"><div class="it" data-accion="actualizar">${svg("reset")}<div>Buscar resultados nuevos ahora<small>${ACTUALIZADO?"Última vez: "+hora(ACTUALIZADO):"Todavía no se pudo leer la planilla"}${ERROR_PLANILLA?" · "+h(ERROR_PLANILLA):""}</small></div></div></div>`
         :`<div class="card menu"><div class="it" data-accion="reset">${svg("reset")}<div>Volver la demo al principio<small>Borra lo cargado en este celular</small></div></div></div>`}
-  <div class="pie">${REAL?"":"Demo para mostrar · "}${h(CONFIG.nombre)}</div>`;
+  <div class="pie">${REAL?"":"Demo para mostrar · "}${h(CONFIG.nombre)}</div>${pieAutor()}`;
 }
 
 /* ---------- Organizador ---------- */
@@ -964,7 +968,7 @@ function pintarCabecera(){
 }
 function render(){
   pintarCabecera();
-  if(!S){ main.innerHTML=`<div class="card" style="text-align:center;padding:24px">Buscando los resultados…</div>`; document.getElementById("nav").innerHTML=""; return; }
+  if(!S){ main.innerHTML=`<div class="card" style="text-align:center;padding:24px">Buscando los resultados…</div>${pieAutor()}`; document.getElementById("nav").innerHTML=""; return; }
   main.innerHTML=VISTAS[pantalla]();
   document.getElementById("nav").innerHTML=TABS.map(([k,t])=>`<button data-go="${k}" class="${tabDe(pantalla)===k?"on":""}">${svg(k)}${t}</button>`).join("");
   if(pantalla==="insta") dibujarPlaca();

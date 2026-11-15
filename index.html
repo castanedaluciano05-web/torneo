@@ -180,7 +180,7 @@ textarea{width:100%;min-height:200px;border:1px solid var(--borde);border-radius
    compartida como «Cualquier persona con el enlace · Lector».
    Vacío = DEMO con datos inventados (se carga desde la misma aplicación).
    También se puede probar con  Torneo.html?planilla=ENLACE   o   Torneo.html?prueba=local  */
-const PLANILLA = "";
+const PLANILLA = "https://docs.google.com/spreadsheets/d/146sPh-eBFzlLoYtFEURtS1SCxnpWW_M2GHzwv_Yj3EY/edit";   // ?demo=1 muestra la demo
 /* PUENTE: el enlace del Apps Script de la planilla (termina en /exec). Con él, árbitros y veedores
    cargan desde la aplicación. Vacío = sólo lectura. En la DEMO se simula (códigos 1111 árbitro, 2222 veedor). */
 const PUENTE = "";
@@ -260,7 +260,7 @@ function estadoInicial(){
 
 /* ===================== ESTADO ===================== */
 const QS=new URLSearchParams(location.search);
-const ORIGEN = QS.get("prueba")==="local" ? "local" : (QS.get("planilla")||PLANILLA).trim();
+const ORIGEN = QS.get("demo")==="1" ? "" : QS.get("prueba")==="local" ? "local" : (QS.get("planilla")||PLANILLA).trim();
 const REAL = !!ORIGEN;                       // true = lee la planilla; false = demo
 const KEY = REAL ? "torneo_datos_v2_"+(ORIGEN==="local"?"local":idDePlanilla(ORIGEN)) : "torneo_demo_v2";
 const PUENTE_URL = (QS.get("puente")||PUENTE).trim();
@@ -308,7 +308,9 @@ async function traerPlanilla(){
   const [P,C,E,PU,CF,IN,JU]=await Promise.all(["Partidos","Cruces","Equipos","Publicidad","Configuración","Incidencias","Jugadores"].map(n=>hoja(n).catch(e=>{ if(n==="Partidos"||n==="Equipos") throw e; return []; })));
   const d={equipos:[],partidos:[],cruces:{},sponsors:[],config:{},incidencias:[],jugadores:[],cuando:Date.now()};
   const idx={};
-  const idEq=(n,c)=>{ n=String(n||"").trim(); if(!n) return null; const k=n.toLowerCase(); if(!(k in idx)){ idx[k]=d.equipos.length; d.equipos.push([n,c||""]); } return idx[k]; };
+  // los equipos salen del fixture; la hoja «Equipos» sólo da el orden y el color (así una aclaración al pie no se vuelve un equipo)
+  const enFixture=new Set(); P.forEach(r=>{ [r["Local"],r["Visitante"]].forEach(x=>{ x=String(x||"").trim(); if(x) enFixture.add(x.toLowerCase()); }); });
+  const idEq=(n,c)=>{ n=String(n||"").trim(); if(!n) return null; const k=n.toLowerCase(); if(!(k in idx)){ if(!enFixture.has(k)) return null; idx[k]=d.equipos.length; d.equipos.push([n,c||""]); } return idx[k]; };
   E.forEach(r=>idEq(r["Equipo"],r["Color"]));
   P.forEach((r,i)=>{
     const l=idEq(r["Local"]), v=idEq(r["Visitante"]), fe=parseInt(r["Fecha"],10);
